@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import traceback
 
 
 def append_sheet(house_data):
@@ -32,6 +33,9 @@ class HouseScraper:
         was_exception = False
         try:
             full_link = find_full_link.group()
+            if 'realtor.com' in full_link and not  full_link.endswith('?view=qv'):
+                    full_link += '?view=qv'
+
             print(full_link)
             self.full_link = full_link
 
@@ -96,13 +100,16 @@ class HouseScraper:
                 data['Lot_size'] = lot_size.text + ' ' + lot_size_units.text
 
                 data['Link'] = full_link
-            except:
+            except Exception as e:
                 address = full_link.replace('https://www.realtor.com/realestateandhomes-detail/', '')
                 address = address.split('?')[0]
 
                 data['Address'] = address
                 data['Link'] = full_link
                 print('Could not retrieve all data')
+                print(e)
+                traceback.print_exc()
+
 
         elif 'trulia.com' in full_link:
             try:

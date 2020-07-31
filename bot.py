@@ -30,8 +30,4 @@ async def on_message(message):
 
         await message.channel.send(msg)
 
-
-
-
-#client.run('NzM4NTUwMTQzNTM1ODA4NjEz.XyNiaw.2m2l2Cy3w4khkP1rDKFgS4N_iWU')
 client.run(os.environ['DISCORD_TOKEN'])
