@@ -11,7 +11,7 @@ import traceback
 def append_sheet(house_data):
     scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-    # creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
+
     json_creds = os.environ["GOOGLE_SHEETS_CREDS_JSON"]
 
     creds_dict = json.loads(json_creds)
@@ -28,27 +28,32 @@ def append_sheet(house_data):
 class HouseScraper:
     def __init__(self, message):
         self.data = []
+        self.headers = {'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'accept-encoding': 'gzip, deflate, sdch, br',
+                        'accept-language': 'en-GB,en;q=0.8,en-US;q=0.6,ml;q=0.4',
+                        'cache-control': 'max-age=0',
+                        'upgrade-insecure-requests': '1',
+                        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
         self.full_link = ''
         find_full_link = re.search('https://www\.[a-zA-Z]+\.com.+', message)
         was_exception = False
         try:
             full_link = find_full_link.group()
-            if 'realtor.com' in full_link and not  full_link.endswith('?view=qv'):
-                    full_link += '?view=qv'
+            if 'realtor.com' in full_link and not full_link.endswith('?view=qv'):
+                if '?cid=other_shares_core_ldp' in full_link:
+                    full_link = full_link.replace('?cid=other_shares_core_ldp', '')
+                elif '-search' in full_link:
+                    site = 'realtor.com'
+                    split_link = full_link.split('/')
+                    address = split_link[len(split_link) - 1].split('?')[0]
+                    full_link = self.search_google_for_house('realtor.com', address)
+
+                full_link += '?view=qv'
 
             print(full_link)
             self.full_link = full_link
 
-            headers = {'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                       'accept-encoding': 'gzip, deflate, sdch, br',
-                       'accept-language': 'en-GB,en;q=0.8,en-US;q=0.6,ml;q=0.4',
-                       'cache-control': 'max-age=0',
-                       'upgrade-insecure-requests': '1',
-                       'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36'}
-
-            # headers = {}
-            # headers['User-Agent'] = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
-            page = requests.get(full_link, headers=headers)
+            page = requests.get(full_link, headers=self.headers)
             print(page)
             soup = BeautifulSoup(page.content, 'lxml')
 
@@ -184,6 +189,21 @@ class HouseScraper:
                 print('Zillow not supported')
 
         self.data = data
+
+    def search_google_for_house(self, site, address):
+        page = requests.get(f'https://www.google.com/search?q={site}+{address}')
+        soup = BeautifulSoup(page.content, 'lxml')
+        all_links = soup.findAll('a')
+        for link in all_links:
+            if 'https://www.realtor.com/realestateandhomes-detail/' in link['href'] and address in link[
+                'href'] and 'google.com' not in link['href']:
+                correct_link = link['href']
+                print(link['href'])
+
+        correct_link = correct_link.replace('/url?q=', '')
+        correct_link = correct_link.split('&')[0]
+
+        return correct_link
 
 
 def scrape_house(message):
